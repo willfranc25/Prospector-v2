@@ -7,7 +7,6 @@ import { Toast } from './components/Toast';
 import { RevisarPage } from './pages/RevisarPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AgregarPage } from './pages/AgregarPage';
-import { LotePage } from './pages/LotePage';
 
 export default function App() {
   const location = useLocation();
@@ -43,7 +42,6 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/revisar" element={<RevisarPage />} />
           <Route path="/agregar" element={<AgregarPage />} />
-          <Route path="/lote" element={<LotePage />} />
         </Routes>
       </div>
       <BottomNav />

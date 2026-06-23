@@ -231,6 +231,39 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Pipeline Run History */}
+      {pipelineRuns.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <div>
+              <span className="card-title">📜 Historial de ejecuciones</span>
+              <p className="card-subtitle">Últimas ejecuciones del pipeline de descubrimiento</p>
+            </div>
+          </div>
+          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {pipelineRuns.slice(0, 15).map((run: any) => {
+              const dots: Record<string, string> = { completed: 'completed', running: 'running', failed: 'failed', pending: 'pending' };
+              const labels: Record<string, string> = { completed: 'Completado', running: 'En ejecución', failed: 'Falló', pending: 'Pendiente' };
+              const colors: Record<string, string> = { completed: 'var(--success)', running: 'var(--info)', failed: 'var(--danger)', pending: 'var(--text-muted)' };
+              return (
+                <div key={run.id} className="run-item">
+                  <div className={clsx('run-status', dots[run.status] || 'pending')} />
+                  <div className="run-info">
+                    <div className="run-strategy">{run.strategy}</div>
+                    <div className="run-meta">
+                      {new Date(run.created_at).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {run.stats?.discovered > 0 && ` · ${run.stats.discovered} perfiles`}
+                      {run.error_message && ` · ${run.error_message}`}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.62rem', color: colors[run.status], fontWeight: 600 }}>{labels[run.status]}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Bottom row: Funnel + Niche Breakdown */}
       <div className="grid-2" style={{ marginTop: 16 }}>
         {/* Funnel */}

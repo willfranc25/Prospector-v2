@@ -5,8 +5,7 @@ import clsx from 'clsx';
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: '📊' },
   { path: '/revisar', label: 'Revisar', icon: '🔍', badge: true },
-  { path: '/agregar', label: 'Agregar', icon: '➕' },
-  { path: '/lote', label: 'Lote', icon: '🌱' }
+  { path: '/agregar', label: 'Agregar', icon: '➕' }
 ];
 
 export function BottomNav() {
