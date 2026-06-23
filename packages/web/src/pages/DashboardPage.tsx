@@ -105,6 +105,14 @@ export function DashboardPage() {
     } catch { showToast('❌ Error al limpiar'); }
   };
 
+  const rescueProfiles = async () => {
+    try {
+      const res = await api.post('/pipeline/score-stuck');
+      showToast(`🔄 ${res.data.message}`);
+      loadLive();
+    } catch { showToast('❌ Error'); }
+  };
+
   const [autoSchedulerOn, setAutoSchedulerOn] = useState(true);
 
   const toggleStrategy = async (strategyId: string, enabled: boolean) => {
@@ -323,6 +331,16 @@ export function DashboardPage() {
             title="Limpiar ejecuciones trabadas"
           >
             🧹 Limpiar
+          </button>
+          <button
+            onClick={rescueProfiles}
+            style={{
+              padding: '3px 10px', borderRadius: 999, fontSize: '0.62rem', fontWeight: 600, cursor: 'pointer',
+              background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.3)'
+            }}
+            title="Recuperar perfiles sin procesar"
+          >
+            🔄 Rescatar
           </button>
           <button
             onClick={() => setAutoSchedulerOn(!autoSchedulerOn)}

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { sql } from '../db/connection.js';
-import { enqueueDiscoveryJob } from '../queue.js';
+import { enqueueDiscoveryJob, enqueueScoringJob } from '../queue.js';
 
 export async function pipelineRoutes(app: FastifyInstance) {
   // GET /api/pipeline/runs
@@ -70,6 +70,26 @@ export async function pipelineRoutes(app: FastifyInstance) {
     `;
 
     return { data: { cleaned: result.length, ids: result.map((r: any) => r.id) } };
+  });
+
+  // POST /api/pipeline/score-stuck — Score all unscored profiles
+  app.post('/pipeline/score-stuck', async () => {
+    const result = await sql`
+      UPDATE profiles
+      SET status = 'nuevo'
+      WHERE status = 'discovered'
+      RETURNING id
+    `;
+
+    // Enqueue these for ML scoring if possible
+    const ids = result.map((r: any) => r.id);
+    if (ids.length > 0) {
+      try {
+        await enqueueScoringJob(ids);
+      } catch {}
+    }
+
+    return { data: { rescued: result.length, message: `${result.length} perfiles movidos a la cola de revisión` } };
   });
 
   // GET /api/pipeline/strategies

@@ -43,3 +43,18 @@ export async function enqueueDiscoveryJob(strategy: string, runId: string, confi
     return null;
   }
 }
+
+export async function enqueueScoringJob(profileIds: string[]) {
+  try {
+    const queue = new Queue('scoring', { connection: getRedis() });
+    await queue.add('score-stuck', {
+      profileIds,
+      useML: true
+    }, { jobId: `score-stuck-${Date.now()}` });
+    console.log(`📤 Enqueued scoring for ${profileIds.length} profiles`);
+    return true;
+  } catch (err: any) {
+    console.warn(`⚠️ Could not enqueue scoring: ${err.message}`);
+    return false;
+  }
+}
