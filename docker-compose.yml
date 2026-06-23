@@ -1,0 +1,100 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: hermes-db
+    environment:
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: hermes_secret
+      POSTGRES_DB: hermes
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./packages/api/src/db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hermes-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    container_name: hermes-api
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://hermes:hermes_secret@postgres:5432/hermes
+      REDIS_URL: redis://redis:6379
+      APIFY_TOKEN: ${APIFY_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  workers:
+    build:
+      context: .
+      dockerfile: packages/workers/Dockerfile
+    container_name: hermes-workers
+    environment:
+      DATABASE_URL: postgresql://hermes:hermes_secret@postgres:5432/hermes
+      REDIS_URL: redis://redis:6379
+      APIFY_TOKEN: ${APIFY_TOKEN:-}
+      ML_SERVICE_URL: http://ml:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ml:
+    build:
+      context: .
+      dockerfile: packages/ml/Dockerfile
+    container_name: hermes-ml
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://hermes:hermes_secret@postgres:5432/hermes
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          memory: 2G
+
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+    container_name: hermes-web
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
