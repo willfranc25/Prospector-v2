@@ -3,7 +3,7 @@ import { sql, redis } from '../index.js';
 import { enrichmentQueue } from '../index.js';
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN || '';
-const FOLLOWER_ACTOR_ID = 'apify~instagram-scraper';
+const FOLLOWER_ACTOR_ID = 'apify~instagram-followers-scraper';
 const HASHTAG_ACTOR_ID = 'apify~instagram-hashtag-scraper';
 const PROFILE_ACTOR_ID = 'dSCLg0C3YEZ83HzYX';
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
@@ -133,9 +133,8 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
   if (APIFY_TOKEN) {
     try {
       const input = {
-        directUrls: seedIds.map((u: string) => `https://www.instagram.com/${u}/`),
-        resultsType: 'followers',
-        resultsLimit: limit
+        username: seedIds,
+        maxItems: limit
       };
 
       console.log(`📤 Starting Apify followers scrape with ${seedIds.length} seeds...`);
@@ -227,10 +226,8 @@ async function discoverFromCompetitors(runId: string, config?: Record<string, an
   if (APIFY_TOKEN) {
     try {
       const input = {
-        directUrls: competitors.map((u: string) => `https://www.instagram.com/${u}/`),
-        resultsType: 'followers',
-        resultsLimit: 500,
-        maxRequestRetries: 3
+        username: competitors,
+        maxItems: 500
       };
 
       const res = await fetch(
