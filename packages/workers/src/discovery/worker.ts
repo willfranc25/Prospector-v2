@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { sql, redis } from '../index.js';
-import { discoveryQueue } from '../index.js';
+import { enrichmentQueue } from '../index.js';
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN || '';
 const FOLLOWER_ACTOR_ID = 'scraping_solutions~instagram-scraper-followers-following-no-cookies';
@@ -70,7 +70,7 @@ export async function discoveryWorker(job: Job<DiscoveryJob>) {
       // Add to enrichment queue in batches
       for (let i = 0; i < profiles.length; i += 50) {
         const batch = profiles.slice(i, i + 50);
-        await discoveryQueue.add('enrich', {
+        await enrichmentQueue.add('enrich-batch', {
           profiles: batch,
           pipelineRunId: run.id,
           strategy

@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { discoveryWorker } from './discovery/worker.js';
 import { enrichmentWorker } from './enrichment/worker.js';
 import { scoringWorker } from './scoring/worker.js';
+import { retrainWorker } from './scoring/retrain.js';
 import { schedulerWorker } from './discovery/scheduler.js';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -53,6 +54,13 @@ async function start() {
     connection: redis
   });
   workers.push(schedWorker);
+
+  // Retrain worker — handles ML model retraining
+  const rtWorker = new Worker('retrain', retrainWorker, {
+    connection: redis,
+    concurrency: 1
+  });
+  workers.push(rtWorker);
 
   // Set up recurring scheduler jobs
   await setupSchedules();
