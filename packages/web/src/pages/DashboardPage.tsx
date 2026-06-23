@@ -206,9 +206,43 @@ export function DashboardPage() {
         )}
       </div>
 
+      {/* Live Activity — Running Jobs */}
+      {live && live.runningRuns?.length > 0 && (
+        <div className="card" style={{ marginBottom: 20, borderColor: 'rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.03)' }}>
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--info)', boxShadow: '0 0 10px var(--info)', animation: 'pulse 1.5s infinite' }} />
+              <span className="card-title" style={{ color: 'var(--info)' }}>🔍 Actividad en vivo — {live.runningRuns.length} estrategia{live.runningRuns.length > 1 ? 's' : ''} ejecutándose</span>
+            </div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Actualización cada 15s</span>
+          </div>
+          {live.runningRuns.map((run: any) => {
+            const elapsed = run.started_at ? Math.round((Date.now() - new Date(run.started_at).getTime()) / 1000) : 0;
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            const s = strategies.find((st: any) => st.id === run.strategy);
+            return (
+              <div key={run.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '1.2rem' }}>{STRATEGY_ICONS[run.strategy] || '🔄'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{s?.name || run.strategy}</div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    Ejecutando hace {mins}m {secs}s · Fase: {run.step || 'discovery'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: '0.8rem', animation: 'pulse 1.5s infinite' }}>⏳</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--info)', fontWeight: 600 }}>En progreso</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Pipeline Status Bar */}
       {live && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', alignItems: 'center', fontSize: '0.72rem' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', alignItems: 'center', fontSize: '0.72rem', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 700, color: 'var(--text-muted)', marginRight: 8 }}>PIPELINE</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: 'var(--brand-light)', fontWeight: 700 }}>{fmtNum(live.last24h?.reduce((a: number, r: any) => a + r.total_discovered, 0) || 0)}</span>
@@ -217,11 +251,11 @@ export function DashboardPage() {
           <span style={{ color: 'var(--border-light)' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: 'var(--info)', fontWeight: 700 }}>{runningCount}</span>
-            <span style={{ color: 'var(--text-muted)' }}>activos</span>
+            <span style={{ color: 'var(--text-muted)' }}>{runningCount === 1 ? 'activo' : 'activos'}</span>
           </div>
           <span style={{ color: 'var(--border-light)' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{live.pendingJobs || 0}</span>
+            <span style={{ color: runningCount === 0 ? 'var(--text-muted)' : 'var(--warning)', fontWeight: 700 }}>{live.pendingJobs || 0}</span>
             <span style={{ color: 'var(--text-muted)' }}>en cola</span>
           </div>
           <span style={{ color: 'var(--border-light)' }}>|</span>
