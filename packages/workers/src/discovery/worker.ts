@@ -125,7 +125,9 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
     return [];
   }
 
-  const limit = config?.resultsLimit || 500;
+  // DEBUG: test with 1 seed + low limit to match manual working test
+  const limit = Math.min(config?.resultsLimit || 25, 25);
+  seedIds = seedIds.slice(0, 1);
 
   console.log(`📱 Discovering followers for ${seedIds.length} seeds (limit: ${limit})`);
   console.log(`📤 Input: ${JSON.stringify({ Account: seedIds.slice(0, 3), dataToScrape: 'Followers', resultsLimit: limit, _totalSeeds: seedIds.length })}`);
