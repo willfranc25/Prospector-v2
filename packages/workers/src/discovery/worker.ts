@@ -128,6 +128,7 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
   const limit = config?.resultsLimit || 500;
 
   console.log(`📱 Discovering followers for ${seedIds.length} seeds (limit: ${limit})`);
+  console.log(`📤 Input: ${JSON.stringify({ Account: seedIds.slice(0, 3), dataToScrape: 'Followers', resultsLimit: limit, _totalSeeds: seedIds.length })}`);
 
   // If APIFY_TOKEN is set, actually call Apify API
   if (APIFY_TOKEN) {
@@ -290,46 +291,49 @@ async function pollApifyRun(token: string, runId: string, datasetId: string, pip
       if (data.status === 'SUCCEEDED') {
         console.log(`✅ Apify run completed (dataset: ${datasetId})`);
         
+        // Small delay — some actors write results after marking SUCCEEDED
+        await new Promise(r => setTimeout(r, 3000));
+        
         // Try multiple ways to get items
         let items: any[] = [];
         
-        // Method 1: default dataset
-        try {
-          const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`, {
-            signal: AbortSignal.timeout(30000)
-          });
-          if (itemsRes.ok) {
-            items = await itemsRes.json();
-            console.log(`📦 Method 1 (defaultDataset): ${items.length} items`);
-          }
-        } catch (e: any) { console.warn(`Method 1 failed: ${e.message}`); }
-        
-        // Method 2: try getting all datasets for the run and check each
-        if (items.length === 0) {
+        // Method 1: default dataset (with format=json and clean=true)
+        for (const format of ['json', 'csv', 'clean']) {
           try {
-            const dsRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/datasets?token=${token}`);
-            if (dsRes.ok) {
-              const datasets = await dsRes.json();
-              const dsList = datasets.data?.items || datasets.data || datasets || [];
-              console.log(`📂 Found ${Array.isArray(dsList) ? dsList.length : 0} datasets for run`);
-              for (const ds of (Array.isArray(dsList) ? dsList : [])) {
-                const dsId = ds.id || ds.datasetId || ds;
-                try {
-                  const itemsRes2 = await fetch(`https://api.apify.com/v2/datasets/${dsId}/items?token=${token}`);
-                  if (itemsRes2.ok) {
-                    const dsItems = await itemsRes2.json();
-                    if (dsItems.length > 0) {
-                      console.log(`📦 Dataset ${dsId}: ${dsItems.length} items`);
-                      items = items.concat(dsItems);
-                    }
-                  }
-                } catch {}
+            const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?format=${format}&clean=true&token=${token}`, {
+              signal: AbortSignal.timeout(30000)
+            });
+            if (itemsRes.ok) {
+              const data = await itemsRes.json();
+              if (Array.isArray(data) && data.length > 0) {
+                items = data;
+                console.log(`📦 Method 1 (format=${format}): ${items.length} items`);
+                break;
               }
             }
-          } catch (e: any) { console.warn(`Dataset listing failed: ${e.message}`); }
+          } catch (e: any) { console.warn(`Format ${format} failed: ${e.message}`); }
+        }
+        
+        // Method 2: key-value store
+        if (items.length === 0) {
+          try {
+            const { defaultKeyValueStoreId } = data;
+            const kvId = defaultKeyValueStoreId || datasetId.replace('dataset', 'record');
+            const kvRes = await fetch(`https://api.apify.com/v2/key-value-stores/${kvId}/records/OUTPUT?token=${token}`);
+            if (kvRes.ok) {
+              const kvData = await kvRes.json();
+              if (Array.isArray(kvData) && kvData.length > 0) {
+                items = kvData;
+                console.log(`📦 Method 2 (key-value store OUTPUT): ${items.length} items`);
+              }
+            }
+          } catch (e: any) { console.warn(`Key-value store failed: ${e.message}`); }
         }
         
         console.log(`📦 Total items from Apify: ${items.length}`);
+        if (items.length === 0) {
+          console.warn(`⚠️ Run ${runId} completed but no items found in any location`);
+        }
         return items;
       }
 
