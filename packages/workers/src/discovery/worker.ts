@@ -3,7 +3,7 @@ import { sql, redis } from '../index.js';
 import { enrichmentQueue } from '../index.js';
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN || '';
-const FOLLOWER_ACTOR_ID = 'scraping_solutions~instagram-scraper-followers-following-no-cookies';
+const FOLLOWER_ACTOR_ID = 'apify~instagram-scraper';
 const HASHTAG_ACTOR_ID = 'apify~instagram-hashtag-scraper';
 const PROFILE_ACTOR_ID = 'dSCLg0C3YEZ83HzYX';
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
@@ -133,15 +133,10 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
   if (APIFY_TOKEN) {
     try {
       const input = {
-        Account: seedIds,
-        username: seedIds,
-        usernames: seedIds,
         directUrls: seedIds.map((u: string) => `https://www.instagram.com/${u}/`),
-        dataToScrape: 'Followers',
-        searchType: 'followers',
-        maxItems: limit,
+        resultsType: 'followers',
         resultsLimit: limit,
-        enrichProfile: true
+        maxRequestRetries: 3
       };
 
       const res = await fetch(
@@ -228,12 +223,10 @@ async function discoverFromCompetitors(runId: string, config?: Record<string, an
   if (APIFY_TOKEN) {
     try {
       const input = {
-        Account: competitors,
         directUrls: competitors.map((u: string) => `https://www.instagram.com/${u}/`),
-        dataToScrape: 'Followers',
-        searchType: 'followers',
-        maxItems: 500,
-        resultsLimit: 500
+        resultsType: 'followers',
+        resultsLimit: 500,
+        maxRequestRetries: 3
       };
 
       const res = await fetch(
