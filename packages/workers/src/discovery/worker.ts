@@ -134,8 +134,8 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
     try {
       const input = {
         Account: seedIds,
-        resultsPerAccount: Math.min(limit, 500),
-        scrapeType: 'Followers'
+        dataToScrape: 'Followers',
+        resultsLimit: limit
       };
 
       console.log(`📤 Starting Apify followers scrape with ${seedIds.length} seeds...`);
@@ -228,8 +228,8 @@ async function discoverFromCompetitors(runId: string, config?: Record<string, an
     try {
       const input = {
         Account: competitors,
-        resultsPerAccount: 500,
-        scrapeType: 'Followers'
+        dataToScrape: 'Followers',
+        resultsLimit: 500
       };
 
       const res = await fetch(
