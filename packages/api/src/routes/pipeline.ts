@@ -25,7 +25,6 @@ export async function pipelineRoutes(app: FastifyInstance) {
     const [run] = await sql`SELECT * FROM pipeline_runs WHERE id = ${id}`;
     if (!run) return { error: 'Run not found', code: 404 };
 
-    // Get profiles discovered in this run
     const profiles = await sql`
       SELECT COUNT(*)::int as total,
              COUNT(*) FILTER (WHERE status = 'nuevo')::int as nuevo,
@@ -35,6 +34,28 @@ export async function pipelineRoutes(app: FastifyInstance) {
     `;
 
     return { data: { ...run, outcome: profiles[0] } };
+  });
+
+  // DELETE /api/pipeline/runs/:id — Cancel/stop a running pipeline
+  app.delete('/pipeline/runs/:id', async (req) => {
+    const { id } = req.params as { id: string };
+
+    const [run] = await sql`SELECT * FROM pipeline_runs WHERE id = ${id}`;
+    if (!run) return { error: 'Run not found', code: 404 };
+
+    if (run.status === 'completed' || run.status === 'failed') {
+      return { error: 'Run already finished', code: 400 };
+    }
+
+    await sql`
+      UPDATE pipeline_runs
+      SET status = 'failed',
+          error_message = 'Cancelado por el usuario',
+          completed_at = NOW()
+      WHERE id = ${id}
+    `;
+
+    return { data: { id, status: 'failed', message: 'Búsqueda cancelada' } };
   });
 
   // GET /api/pipeline/strategies

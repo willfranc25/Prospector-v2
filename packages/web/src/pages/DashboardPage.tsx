@@ -75,6 +75,14 @@ export function DashboardPage() {
     setRunningStrategy(null);
   };
 
+  const cancelRun = async (runId: string) => {
+    try {
+      await api.delete(`/pipeline/runs/${runId}`);
+      showToast('🛑 Búsqueda cancelada');
+      loadLive();
+    } catch { showToast('❌ Error al cancelar'); }
+  };
+
   const toggleStrategy = async (strategyId: string, enabled: boolean) => {
     try {
       await api.put(`/pipeline/strategies/${strategyId}`, { enabled: !enabled });
@@ -233,6 +241,17 @@ export function DashboardPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: '0.8rem', animation: 'pulse 1.5s infinite' }}>⏳</span>
                   <span style={{ fontSize: '0.7rem', color: 'var(--info)', fontWeight: 600 }}>En progreso</span>
+                  <button
+                    onClick={() => cancelRun(run.id)}
+                    style={{
+                      marginLeft: 8, padding: '4px 10px', borderRadius: 999,
+                      fontSize: '0.62rem', fontWeight: 600, cursor: 'pointer',
+                      background: 'rgba(239,68,68,0.15)', color: 'var(--danger)',
+                      border: '1px solid rgba(239,68,68,0.3)'
+                    }}
+                  >
+                    🛑 Cancelar
+                  </button>
                 </div>
               </div>
             );
