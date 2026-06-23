@@ -61,9 +61,23 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchStats(); fetchFunnel(); fetchThroughput(); fetchNiches(); fetchPipelineRuns(); loadLive(); loadDailyStats();
-    const interval = setInterval(() => { loadLive(); loadDailyStats(); }, 15000);
+    // Refresh every 3 seconds when active, every 10 when idle
+    const interval = setInterval(() => {
+      loadLive();
+      const s = useStore.getState();
+      s.fetchStats();
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Client-side elapsed timer for running jobs
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if ((live?.running || 0) > 0) {
+      const t = setInterval(() => setNow(Date.now()), 1000);
+      return () => clearInterval(t);
+    }
+  }, [live?.running]);
 
   const triggerStrategy = async (strategyId: string) => {
     setRunningStrategy(strategyId);
@@ -90,6 +104,8 @@ export function DashboardPage() {
       loadLive();
     } catch { showToast('❌ Error al limpiar'); }
   };
+
+  const [autoSchedulerOn, setAutoSchedulerOn] = useState(true);
 
   const toggleStrategy = async (strategyId: string, enabled: boolean) => {
     try {
@@ -233,7 +249,7 @@ export function DashboardPage() {
             <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Actualización cada 15s</span>
           </div>
           {live.runningRuns.map((run: any) => {
-            const elapsed = run.started_at ? Math.round((Date.now() - new Date(run.started_at).getTime()) / 1000) : 0;
+            const elapsed = run.started_at ? Math.round((now - new Date(run.started_at).getTime()) / 1000) : 0;
             const mins = Math.floor(elapsed / 60);
             const secs = elapsed % 60;
             const s = strategies.find((st: any) => st.id === run.strategy);
@@ -241,9 +257,14 @@ export function DashboardPage() {
               <div key={run.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: '1.2rem' }}>{STRATEGY_ICONS[run.strategy] || '🔄'}</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{s?.name || run.strategy}</div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                    Ejecutando hace {mins}m {secs}s · Fase: {run.step || 'discovery'}
+                  <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                    {s?.name || run.strategy}
+                    {!run.input_config?.manual && (
+                      <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginLeft: 6, fontWeight: 400 }}>(automático)</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    ⏱ {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')} · Fase: {run.step || 'discovery'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -302,6 +323,18 @@ export function DashboardPage() {
             title="Limpiar ejecuciones trabadas"
           >
             🧹 Limpiar
+          </button>
+          <button
+            onClick={() => setAutoSchedulerOn(!autoSchedulerOn)}
+            style={{
+              padding: '3px 10px', borderRadius: 999, fontSize: '0.62rem', fontWeight: 600, cursor: 'pointer',
+              background: autoSchedulerOn ? 'rgba(34,197,94,0.12)' : 'rgba(100,116,139,0.12)',
+              color: autoSchedulerOn ? 'var(--success)' : 'var(--text-muted)',
+              border: `1px solid ${autoSchedulerOn ? 'rgba(34,197,94,0.3)' : 'var(--border-light)'}`
+            }}
+            title={autoSchedulerOn ? 'Auto-descubrimiento activo (2,10,18h)' : 'Auto-descubrimiento pausado'}
+          >
+            {autoSchedulerOn ? '🤖 Auto ON' : '⏸ Auto OFF'}
           </button>
         </div>
       )}
