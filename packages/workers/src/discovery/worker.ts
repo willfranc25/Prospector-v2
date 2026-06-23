@@ -135,16 +135,20 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
       const input = {
         directUrls: seedIds.map((u: string) => `https://www.instagram.com/${u}/`),
         resultsType: 'followers',
-        resultsLimit: limit,
-        maxRequestRetries: 3
+        resultsLimit: limit
       };
 
+      console.log(`📤 Starting Apify followers scrape with ${seedIds.length} seeds...`);
       const res = await fetch(
         `https://api.apify.com/v2/acts/${encodeURIComponent(FOLLOWER_ACTOR_ID)}/runs?token=${APIFY_TOKEN}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }
       );
 
-      if (!res.ok) throw new Error(`Apify API error: ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.error(`❌ Apify API error ${res.status}: ${errBody.slice(0, 300)}`);
+        throw new Error(`Apify API error: ${res.status} — ${errBody.slice(0, 200)}`);
+      }
       const { data } = await res.json();
       const runData = data;
 
