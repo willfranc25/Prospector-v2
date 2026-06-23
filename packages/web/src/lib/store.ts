@@ -193,6 +193,19 @@ export const useStore = create<AppState>((set, get) => ({
     return res.data;
   },
 
+  fetchLivePipeline: async () => {
+    const res = await api.get('/pipeline/live');
+    return res.data;
+  },
+
+  triggerStrategy: async (strategyId: string) => {
+    return api.post(`/pipeline/strategies/${strategyId}/run`);
+  },
+
+  toggleStrategy: async (strategyId: string, enabled: boolean) => {
+    return api.put(`/pipeline/strategies/${strategyId}`, { enabled });
+  },
+
   fetchSettings: async () => {
     const res = await api.get('/settings');
     set({ settings: res.data });

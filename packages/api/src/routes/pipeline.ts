@@ -75,6 +75,67 @@ export async function pipelineRoutes(app: FastifyInstance) {
     return { data: stats };
   });
 
+  // POST /api/pipeline/strategies/:id/run — Trigger a strategy manually
+  app.post('/pipeline/strategies/:id/run', async (req) => {
+    const { id } = req.params as { id: string };
+    const [strategy] = await sql`SELECT * FROM discovery_strategies WHERE id = ${id}`;
+    if (!strategy) return { error: 'Strategy not found', code: 404 };
+
+    // Create a pipeline run
+    const [run] = await sql`
+      INSERT INTO pipeline_runs (strategy, status, input_config)
+      VALUES (${id}, 'pending', ${JSON.stringify({ manual: true, config: strategy.config })})
+      RETURNING id
+    `;
+
+    return {
+      data: { runId: run.id, strategy: id, status: 'pending', message: `Estrategia "${strategy.name}" encolada para ejecución` }
+    };
+  });
+
+  // GET /api/pipeline/live — Live pipeline status
+  app.get('/pipeline/live', async () => {
+    // Currently running
+    const running = await sql`
+      SELECT * FROM pipeline_runs WHERE status = 'running' ORDER BY started_at DESC LIMIT 5
+    `;
+
+    // Recent completions (last 24h)
+    const recent = await sql`
+      SELECT strategy, COUNT(*)::int as count,
+             SUM((stats->>'discovered')::int)::int as total_discovered
+      FROM pipeline_runs
+      WHERE status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours'
+      GROUP BY strategy
+      ORDER BY total_discovered DESC
+    `;
+
+    // Queue sizes (pending runs)
+    const pending = await sql`
+      SELECT COUNT(*)::int as count FROM pipeline_runs WHERE status = 'pending'
+    `;
+
+    // All strategies with last run info
+    const strategies = await sql`
+      SELECT ds.*,
+        (SELECT pr.status FROM pipeline_runs pr WHERE pr.strategy = ds.id ORDER BY pr.created_at DESC LIMIT 1) as last_status,
+        (SELECT pr.completed_at FROM pipeline_runs pr WHERE pr.strategy = ds.id ORDER BY pr.created_at DESC LIMIT 1) as last_run_at,
+        (SELECT (pr.stats->>'discovered')::int FROM pipeline_runs pr WHERE pr.strategy = ds.id AND pr.status = 'completed' ORDER BY pr.created_at DESC LIMIT 1) as last_discovered
+      FROM discovery_strategies ds
+      ORDER BY ds.priority DESC
+    `;
+
+    return {
+      data: {
+        running: running.length,
+        runningRuns: running,
+        pendingJobs: pending.count,
+        last24h: recent,
+        strategies
+      }
+    };
+  });
+
   // GET /api/pipeline/funnel
   app.get('/pipeline/funnel', async () => {
     const [funnel] = await sql`
