@@ -218,8 +218,8 @@ INSERT INTO niches (id, label, weight, keywords) VALUES
 ('otro', 'Sin nicho claro', 25, ARRAY[]::text[]);
 
 INSERT INTO discovery_strategies (id, name, description, schedule, priority, config) VALUES
-('followers_seed', 'Followers de semillas', 'Extrae seguidores de clientes confirmados', 'daily', 10, '{"actorId":"apify~instagram-scraper","resultsLimit":500}'),
-('following_seed', 'Following de semillas', 'Extrae a quién siguen los clientes confirmados', 'weekly', 8, '{"actorId":"apify~instagram-scraper","resultsLimit":200}'),
+('followers_seed', 'Followers de semillas', 'Extrae seguidores de clientes confirmados', 'daily', 10, '{"actorId":"apify~instagram-followers-scraper","resultsLimit":500}'),
+('following_seed', 'Following de semillas', 'Extrae a quién siguen los clientes confirmados', 'weekly', 8, '{"actorId":"apify~instagram-followers-scraper","resultsLimit":200}'),
 ('hashtag', 'Hashtags por nicho', 'Busca perfiles en hashtags profesionales', 'daily', 7, '{"actorId":"apify~instagram-hashtag-scraper","resultsLimit":300}'),
 ('semantic_search', 'Búsqueda semántica', 'Encuentra perfiles similares a top clients vía embeddings', 'weekly', 9, '{}'),
 ('location', 'Búsqueda por ubicación', 'Busca perfiles en ciudades objetivo', 'weekly', 6, '{}'),
@@ -230,6 +230,6 @@ INSERT INTO discovery_strategies (id, name, description, schedule, priority, con
 INSERT INTO settings (key, value) VALUES
 ('filters', '{"minFollowers":3000,"maxFollowers":200000,"minPosts":9,"filterPrivate":true,"filterNoBio":true,"requireSpanish":true,"requireTargetLocation":true}'),
 ('benchmark', '{"perHour":125,"description":"500 perfiles en 4 horas manual"}'),
-('apify', '{"token":"","followerActorId":"apify~instagram-scraper","profileActorId":"dSCLg0C3YEZ83HzYX","defaultLimit":500}'),
+('apify', '{"token":"","followerActorId":"apify~instagram-followers-scraper","profileActorId":"dSCLg0C3YEZ83HzYX","defaultLimit":500}'),
 ('batch', '{"size":14,"cooldownDays":14}'),
 ('ml', '{"minSamplesForRetrain":50,"activeLearningBatchSize":25,"embeddingModel":"intfloat/multilingual-e5-large","retrainSchedule":"0 3 * * *"}');
