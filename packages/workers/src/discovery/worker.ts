@@ -288,13 +288,48 @@ async function pollApifyRun(token: string, runId: string, datasetId: string, pip
       } catch {}
 
       if (data.status === 'SUCCEEDED') {
-        console.log(`✅ Apify run completed, fetching dataset ${datasetId}...`);
-        const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`, {
-          signal: AbortSignal.timeout(30000)
-        });
-        if (!itemsRes.ok) throw new Error(`Dataset fetch failed: ${itemsRes.status}`);
-        const items = await itemsRes.json();
-        console.log(`📦 Got ${items.length} items from Apify`);
+        console.log(`✅ Apify run completed (dataset: ${datasetId})`);
+        
+        // Try multiple ways to get items
+        let items: any[] = [];
+        
+        // Method 1: default dataset
+        try {
+          const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`, {
+            signal: AbortSignal.timeout(30000)
+          });
+          if (itemsRes.ok) {
+            items = await itemsRes.json();
+            console.log(`📦 Method 1 (defaultDataset): ${items.length} items`);
+          }
+        } catch (e: any) { console.warn(`Method 1 failed: ${e.message}`); }
+        
+        // Method 2: try getting all datasets for the run and check each
+        if (items.length === 0) {
+          try {
+            const dsRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/datasets?token=${token}`);
+            if (dsRes.ok) {
+              const datasets = await dsRes.json();
+              const dsList = datasets.data?.items || datasets.data || datasets || [];
+              console.log(`📂 Found ${Array.isArray(dsList) ? dsList.length : 0} datasets for run`);
+              for (const ds of (Array.isArray(dsList) ? dsList : [])) {
+                const dsId = ds.id || ds.datasetId || ds;
+                try {
+                  const itemsRes2 = await fetch(`https://api.apify.com/v2/datasets/${dsId}/items?token=${token}`);
+                  if (itemsRes2.ok) {
+                    const dsItems = await itemsRes2.json();
+                    if (dsItems.length > 0) {
+                      console.log(`📦 Dataset ${dsId}: ${dsItems.length} items`);
+                      items = items.concat(dsItems);
+                    }
+                  }
+                } catch {}
+              }
+            }
+          } catch (e: any) { console.warn(`Dataset listing failed: ${e.message}`); }
+        }
+        
+        console.log(`📦 Total items from Apify: ${items.length}`);
         return items;
       }
 
