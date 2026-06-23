@@ -58,6 +58,20 @@ export async function pipelineRoutes(app: FastifyInstance) {
     return { data: { id, status: 'failed', message: 'Búsqueda cancelada' } };
   });
 
+  // POST /api/pipeline/clean-stuck — Clean stuck running runs
+  app.post('/pipeline/clean-stuck', async () => {
+    const result = await sql`
+      UPDATE pipeline_runs
+      SET status = 'failed',
+          error_message = 'Cancelado (limpieza automática)',
+          completed_at = NOW()
+      WHERE status = 'running'
+      RETURNING id
+    `;
+
+    return { data: { cleaned: result.length, ids: result.map((r: any) => r.id) } };
+  });
+
   // GET /api/pipeline/strategies
   app.get('/pipeline/strategies', async () => {
     const strategies = await sql`

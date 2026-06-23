@@ -83,6 +83,14 @@ export function DashboardPage() {
     } catch { showToast('❌ Error al cancelar'); }
   };
 
+  const cleanStuckRuns = async () => {
+    try {
+      const res = await api.post('/pipeline/clean-stuck');
+      showToast(`🧹 ${res.data.cleaned} ejecuciones limpiadas`);
+      loadLive();
+    } catch { showToast('❌ Error al limpiar'); }
+  };
+
   const toggleStrategy = async (strategyId: string, enabled: boolean) => {
     try {
       await api.put(`/pipeline/strategies/${strategyId}`, { enabled: !enabled });
@@ -284,6 +292,17 @@ export function DashboardPage() {
               return count > 0 ? `${count} ${sched === 'daily' ? 'diarias' : sched === 'weekly' ? 'semanales' : 'manuales'}  ` : '';
             })}
           </span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={cleanStuckRuns}
+            style={{
+              padding: '3px 10px', borderRadius: 999, fontSize: '0.62rem', fontWeight: 600, cursor: 'pointer',
+              background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-light)'
+            }}
+            title="Limpiar ejecuciones trabadas"
+          >
+            🧹 Limpiar
+          </button>
         </div>
       )}
 
