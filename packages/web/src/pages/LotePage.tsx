@@ -1,138 +1,141 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../lib/store';
+import clsx from 'clsx';
 
 export function LotePage() {
   const { generateBatch, fetchPipelineRuns, pipelineRuns, showToast } = useStore();
   const [batch, setBatch] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [runs, setRuns] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchPipelineRuns().then(r => setRuns(r));
-  }, []);
+  useEffect(() => { fetchPipelineRuns(); }, []);
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const result = await generateBatch(14);
-      setBatch(result.data);
-    } catch (err: any) {
-      showToast('⚠️ Error al generar lote');
-    }
+      const r = await generateBatch(14);
+      setBatch(r.data);
+      showToast('🌱 Lote generado');
+    } catch { showToast('⚠️ Error al generar lote'); }
     setLoading(false);
   };
 
-  const handleCopyJson = () => {
+  const copyJson = () => {
     if (batch?.jsonConfig) {
       navigator.clipboard.writeText(batch.jsonConfig);
       showToast('📋 Copiado al portapapeles');
     }
   };
 
-  const statusEmoji: Record<string, string> = {
-    pending: '⏳', running: '🔄', completed: '✅', failed: '❌'
+  const statusStyles: Record<string, { dot: string; label: string; color: string }> = {
+    completed: { dot: 'completed', label: 'Completado', color: 'var(--success)' },
+    running: { dot: 'running', label: 'En ejecución', color: 'var(--info)' },
+    failed: { dot: 'failed', label: 'Falló', color: 'var(--danger)' },
+    pending: { dot: 'pending', label: 'Pendiente', color: 'var(--text-muted)' }
   };
 
   return (
-    <div className="page-container">
-      {/* Generate batch */}
-      <div className="card">
-        <h2 className="card-title">🌱 Generar lote de descubrimiento</h2>
-        <p className="stats-note">
-          El sistema elige qué clientes usar como semilla, priorizando nichos de alta
-          conversión y evitando los usados recientemente.
-        </p>
-        <button
-          onClick={handleGenerate}
-          disabled={loading}
-          className="btn btn-brand w-full mt-3"
-        >
-          {loading ? '⏳ Generando...' : 'Generar lote recomendado'}
-        </button>
+    <div className="page-content animate-in">
+      <div style={{ marginBottom: 20 }}>
+        <h1 className="topbar-title" style={{ margin: 0 }}>Lote</h1>
+        <p className="topbar-subtitle" style={{ margin: 0 }}>Generación de semillas y pipeline de descubrimiento</p>
+      </div>
 
-        {batch && (
-          <div className="mt-4 space-y-2">
-            <h3 className="font-bold text-sm">
-              Lote recomendado ({batch.picks?.length || 0} cuentas)
-            </h3>
-            <div className="batch-list">
-              {batch.picks?.map((p: any) => (
-                <div key={p.id} className="batch-item">
-                  <span>@{p.username}</span>
-                  <span className="pill">{p.nicheId}</span>
-                </div>
-              ))}
-            </div>
-            {batch.nicheBreakdown && (
-              <div className="stats-note mt-2">
-                {Object.entries(batch.nicheBreakdown).map(([k, v]) => (
-                  <span key={k} className="pill" style={{ marginRight: 4 }}>{k}: {String(v)}</span>
+      <div className="grid-2">
+        {/* Generate Batch */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">🌱 Generar lote</span>
+          </div>
+          <p className="card-subtitle" style={{ marginBottom: 16 }}>
+            El sistema selecciona los mejores clientes semilla según la tasa de conversión de cada nicho,
+            evitando los usados en los últimos 14 días.
+          </p>
+
+          <button onClick={handleGenerate} disabled={loading} className="btn btn-primary btn-lg btn-block">
+            {loading ? '⏳ Analizando nichos...' : 'Generar lote recomendado'}
+          </button>
+
+          {batch && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{batch.picks?.length || 0} cuentas semilla</span>
+              </div>
+
+              <div className="batch-grid">
+                {batch.picks?.map((p: any) => (
+                  <div key={p.id} className="batch-tag">
+                    <span className="batch-tag-user">@{p.username}</span>
+                    <span className="batch-tag-niche">{p.nicheId}</span>
+                  </div>
                 ))}
               </div>
-            )}
 
-            {batch.jsonConfig && (
-              <div className="mt-4">
-                <h3 className="font-bold text-sm mb-2">Configuración para Apify</h3>
-                <pre className="code-block">{batch.jsonConfig}</pre>
-                <button onClick={handleCopyJson} className="btn btn-outline w-full mt-2">
-                  📋 Copiar configuración
-                </button>
-              </div>
-            )}
+              {batch.jsonConfig && (
+                <div style={{ marginTop: 16 }}>
+                  <div className="card-title" style={{ marginBottom: 8, fontSize: '0.8rem' }}>Configuración Apify</div>
+                  <div className="code-block">{batch.jsonConfig}</div>
+                  <button onClick={copyJson} className="btn btn-ghost btn-block" style={{ marginTop: 8 }}>
+                    📋 Copiar JSON
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Pipeline Runs */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">📜 Pipeline</span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+              {pipelineRuns.length} ejecuciones
+            </span>
           </div>
-        )}
-      </div>
+          <p className="card-subtitle" style={{ marginBottom: 16 }}>
+            El sistema ejecuta búsquedas automáticas 3× al día (2AM, 10AM, 6PM) + descubrimiento semanal profundo.
+          </p>
 
-      {/* Pipeline runs history */}
-      <div className="card">
-        <h2 className="card-title">📜 Historial del Pipeline</h2>
-        <p className="stats-note">Ejecuciones automáticas de descubrimiento.</p>
-
-        {runs.length === 0 ? (
-          <p className="stats-note mt-2 italic">Sin ejecuciones todavía.</p>
-        ) : (
-          <div className="space-y-2 mt-2">
-            {runs.map(run => (
-              <div key={run.id} className="pipeline-run-item">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="mr-2">{statusEmoji[run.status] || '❓'}</span>
-                    <span className="font-medium text-sm">{run.strategy}</span>
+          {pipelineRuns.length === 0 ? (
+            <div className="empty-state" style={{ padding: '24px 0' }}>
+              <div className="empty-icon">🔄</div>
+              <div className="empty-desc">El pipeline se activa automáticamente. Configurá APIFY_TOKEN en .env para scraping real.</div>
+            </div>
+          ) : (
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              {pipelineRuns.map(run => {
+                const s = statusStyles[run.status] || statusStyles.pending;
+                return (
+                  <div key={run.id} className="run-item">
+                    <div className={clsx('run-status', s.dot)} />
+                    <div className="run-info">
+                      <div className="run-strategy">{run.strategy}</div>
+                      <div className="run-meta">
+                        {new Date(run.created_at).toLocaleString('es')}
+                        {run.stats?.discovered !== undefined && ` · ${run.stats.discovered} perfiles`}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: s.color, fontWeight: 600 }}>{s.label}</span>
                   </div>
-                  <span className={`
-                    text-xs px-2 py-0.5 rounded-full
-                    ${run.status === 'completed' ? 'bg-green-900 text-green-300' :
-                      run.status === 'failed' ? 'bg-red-900 text-red-300' :
-                      run.status === 'running' ? 'bg-blue-900 text-blue-300' :
-                      'bg-gray-800 text-gray-400'}
-                  `}>
-                    {run.status}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {new Date(run.created_at).toLocaleString('es')}
-                  {run.stats?.discovered !== undefined && (
-                    <span> · {run.stats.discovered} perfiles</span>
-                  )}
-                  {run.error_message && (
-                    <span className="text-red-400"> · {run.error_message}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Auto-discovery note */}
-      <div className="card border-blue-900">
-        <h2 className="card-title">🤖 Descubrimiento Automático</h2>
-        <p className="stats-note">
-          El sistema ejecuta búsquedas automáticas 3 veces al día (2AM, 10AM, 6PM)
-          y un descubrimiento profundo semanal (domingo 3AM).
-          Configurá tu token de Apify en el archivo <code>.env</code> para activarlo.
-        </p>
+      {/* Auto-discovery info */}
+      <div className="card" style={{ borderColor: 'var(--border-brand)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: '1.5rem' }}>🤖</span>
+          <div>
+            <div className="card-title" style={{ marginBottom: 4 }}>Descubrimiento automático</div>
+            <p className="card-subtitle">
+              El sistema usa 10 estrategias de búsqueda combinadas: followers de semillas, hashtags, búsqueda semántica,
+              seguidores de competidores, ubicación, cuentas verificadas y expansión por similitud.
+              Cada perfil pasa por un pipeline de enriquecimiento → clasificación → scoring antes de llegar a tu cola de revisión.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
