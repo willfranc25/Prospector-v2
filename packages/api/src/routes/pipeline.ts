@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { sql } from '../db/connection.js';
+import { enqueueDiscoveryJob } from '../queue.js';
 
 export async function pipelineRoutes(app: FastifyInstance) {
   // GET /api/pipeline/runs
@@ -88,8 +89,27 @@ export async function pipelineRoutes(app: FastifyInstance) {
       RETURNING id
     `;
 
+    // Enqueue the actual discovery job to BullMQ so workers pick it up
+    const job = await enqueueDiscoveryJob(id, run.id, strategy.config);
+
+    // Update the run with the BullMQ job ID
+    if (job) {
+      await sql`
+        UPDATE pipeline_runs SET status = 'running', started_at = NOW()
+        WHERE id = ${run.id}
+      `;
+    }
+
     return {
-      data: { runId: run.id, strategy: id, status: 'pending', message: `Estrategia "${strategy.name}" encolada para ejecución` }
+      data: {
+        runId: run.id,
+        jobId: job?.id || null,
+        strategy: id,
+        status: job ? 'running' : 'pending',
+        message: job
+          ? `🚀 Estrategia "${strategy.name}" en ejecución — los workers están procesando`
+          : `⚠️ Estrategia "${strategy.name}" registrada pero Redis no disponible. Configurá Redis.`
+      }
     };
   });
 

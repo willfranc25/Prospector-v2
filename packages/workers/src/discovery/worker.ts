@@ -10,22 +10,33 @@ const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
 interface DiscoveryJob {
   strategy: string;
+  runId?: string;
   batchId?: string;
   seedIds?: string[];
   config?: Record<string, any>;
 }
 
 export async function discoveryWorker(job: Job<DiscoveryJob>) {
-  const { strategy, batchId, seedIds, config = {} } = job.data;
+  const { strategy, runId, batchId, seedIds, config = {} } = job.data;
 
-  console.log(`🔍 Discovery worker: strategy=${strategy} batch=${batchId || 'none'}`);
+  console.log(`🔍 Discovery worker: strategy=${strategy} runId=${runId || 'auto'}`);
 
-  // Create pipeline run record
-  const [run] = await sql`
-    INSERT INTO pipeline_runs (strategy, status, input_config)
-    VALUES (${strategy}, 'running', ${JSON.stringify(job.data)})
-    RETURNING id
-  `;
+  // Use existing run or create new one
+  let run: any;
+  if (runId) {
+    // Update the existing run created by the API
+    await sql`UPDATE pipeline_runs SET status = 'running', started_at = NOW() WHERE id = ${runId}`;
+    const [r] = await sql`SELECT * FROM pipeline_runs WHERE id = ${runId}`;
+    run = r;
+  } else {
+    // Create a new run (for scheduler-triggered jobs)
+    const [r] = await sql`
+      INSERT INTO pipeline_runs (strategy, status, input_config)
+      VALUES (${strategy}, 'running', ${JSON.stringify(job.data)})
+      RETURNING id
+    `;
+    run = r;
+  }
 
   try {
     let profiles: any[] = [];
