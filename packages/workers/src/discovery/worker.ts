@@ -3,9 +3,9 @@ import { sql, redis } from '../index.js';
 import { enrichmentQueue } from '../index.js';
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN || '';
-const FOLLOWER_ACTOR_ID = 'apify~instagram-followers-scraper';
+// Actor IDs (verified working on Apify)
+const FOLLOWER_ACTOR_ID = 'jWD4G57HhqYY0mFhd';  // scraping_solutions/instagram-scraper-followers-following-no-cookies
 const HASHTAG_ACTOR_ID = 'apify~instagram-hashtag-scraper';
-const PROFILE_ACTOR_ID = 'dSCLg0C3YEZ83HzYX';
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
 interface DiscoveryJob {
