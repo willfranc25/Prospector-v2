@@ -133,8 +133,9 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
   if (APIFY_TOKEN) {
     try {
       const input = {
-        username: seedIds,
-        maxItems: limit
+        Account: seedIds,
+        resultsPerAccount: Math.min(limit, 500),
+        scrapeType: 'Followers'
       };
 
       console.log(`📤 Starting Apify followers scrape with ${seedIds.length} seeds...`);
@@ -226,8 +227,9 @@ async function discoverFromCompetitors(runId: string, config?: Record<string, an
   if (APIFY_TOKEN) {
     try {
       const input = {
-        username: competitors,
-        maxItems: 500
+        Account: competitors,
+        resultsPerAccount: 500,
+        scrapeType: 'Followers'
       };
 
       const res = await fetch(
