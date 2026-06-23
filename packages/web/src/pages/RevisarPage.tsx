@@ -60,7 +60,7 @@ export function RevisarPage() {
 
   const handleAction = async (action: string) => {
     if (!current) return;
-    const msgs: Record<string, string> = { aprobado: '✅ Aprobado', descartado: '❌ Descartado', contactado: '📨 Contactado', cliente: '💰 ¡Cliente!' };
+    const msgs: Record<string, string> = { aprobado: '✅ Aprobado', descartado: '❌ Descartado', contactado: '📨 Contactado', cliente: '💰 ¡Cliente! 🌱 Auto-semilla' };
     await submitFeedback(current.id, action, signals);
     showToast(msgs[action] || 'OK');
     loadNext();
@@ -174,7 +174,7 @@ export function RevisarPage() {
                 {tab === 'aprobado' && (
                   <>
                     <button onClick={() => { submitFeedback(p.id, 'contactado', p.manual_signals); showToast('📨 Contactado'); }} className="icon-btn" title="Contactado">📨</button>
-                    <button onClick={() => { submitFeedback(p.id, 'cliente', p.manual_signals); showToast('💰 ¡Cliente!'); }} className="icon-btn" title="Cliente">💰</button>
+                    <button onClick={() => { submitFeedback(p.id, 'cliente', p.manual_signals); showToast('💰 ¡Cliente! 🌱 Auto-semilla'); }} className="icon-btn" title="Cliente">💰</button>
                   </>
                 )}
               </div>

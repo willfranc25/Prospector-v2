@@ -148,6 +148,24 @@ export async function profileRoutes(app: FastifyInstance) {
       ON CONFLICT (date) DO UPDATE SET ${statField} = daily_stats.${statField} + 1
     `);
 
+    // Auto-seed: when marked as cliente, add to customers table for future discovery
+    if (body.action === 'cliente') {
+      // Get profile details
+      const [profile] = await sql`SELECT username, niche_id, bio FROM profiles WHERE id = ${id}`;
+      if (profile) {
+        // Upsert into customers (don't duplicate)
+        await sql`
+          INSERT INTO customers (username, niche_id, notes, added_date)
+          VALUES (${profile.username}, ${profile.niche_id || 'otro'}, 'Cliente convertido automáticamente', CURRENT_DATE)
+          ON CONFLICT (username) DO UPDATE
+            SET niche_id = EXCLUDED.niche_id,
+                notes = 'Cliente reconvertido',
+                updated_at = NOW()
+        `;
+        app.log.info(`🌱 Auto-seed: ${profile.username} added as customer (niche: ${profile.niche_id})`);
+      }
+    }
+
     // Check if we should trigger ML retraining
     const { count } = await sql`
       SELECT COUNT(*)::int as count FROM feedback_log
@@ -159,6 +177,7 @@ export async function profileRoutes(app: FastifyInstance) {
     return {
       success: true,
       action: body.action,
+      autoSeeded: body.action === 'cliente',
       shouldRetrain: Number(count) >= minSamples
     };
   });
