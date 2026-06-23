@@ -111,7 +111,7 @@ def build_profile_text(profile: ScoreRequest) -> str:
 # ── Scoring Engine ──
 
 NICHE_KEYWORDS = {
-    "salud": ["dra", "dr.", "doctor", "doctora", "médic", "medicina", "nutrici",
+    "salud": ["dra", "dr.", "doctor", "doctora", "médic", "medicina", "nutrici", "psicólog", "psicolog", "fisio", "cirug", "cirujano", "pediatr", "odont", "dentista", "terapia", "clínica", "clinica", "consultorio", "kinesiolog", "dermatólog", "dermatolog", "paciente", "salud", "plástica", "bariatrica", "cardiolog", "traumatolog", "ginecolog", "urólogo", "neurolog", "oncolog", "oftalmolog", "cirujano estético", "cirujana", "doctor", "doctora", "médic", "medicina", "nutrici",
               "psicólog", "psicolog", "fisio", "cirug", "pediatr", "odont", "dentista",
               "terapia", "clínica", "clinica", "consultorio", "kinesiolog", "dermatólog"],
     "dinero": ["ceo", "founder", "empresari", "emprendedor", "dueñ", "negocio propio",
@@ -149,9 +149,13 @@ ANTI_SIGNALS = {
 
 
 def classify_niche(bio_lower: str) -> tuple[str, float]:
-    """Classify profile into niche based on keyword matching."""
+    """Classify profile into niche based on keyword matching with priority."""
+    # Higher-priority niches are checked first
+    NICHE_PRIORITY = ['salud', 'dinero', 'redes', 'finanzas', 'belleza', 'personal', 'arte']
+    
     scores = {}
-    for niche_id, keywords in NICHE_KEYWORDS.items():
+    for niche_id in NICHE_PRIORITY:
+        keywords = NICHE_KEYWORDS.get(niche_id, [])
         hits = sum(1 for kw in keywords if kw in bio_lower)
         if hits > 0:
             scores[niche_id] = hits
@@ -159,6 +163,7 @@ def classify_niche(bio_lower: str) -> tuple[str, float]:
     if not scores:
         return "otro", 0.0
 
+    # Pick the one with most keyword matches
     best = max(scores, key=scores.get)
     total_hits = sum(scores.values())
     confidence = scores[best] / total_hits if total_hits > 0 else 0.0
@@ -194,7 +199,7 @@ def detect_anti_signals(profile: ScoreRequest) -> list[str]:
                 anti.append(signal_type)
             elif signal_type == "follow_ratio_alto" and profile.followers > 0 and profile.following / profile.followers > 10:
                 anti.append(signal_type)
-            elif signal_type == "compra_seguidores" and profile.followers > 5000 and (profile.engagement_rate or 0) < 0.001:
+            elif signal_type == "compra_seguidores" and profile.followers > 5000 and profile.engagement_rate is not None and profile.engagement_rate < 0.001:
                 anti.append(signal_type)
         else:
             if any(kw in bio for kw in keywords):
