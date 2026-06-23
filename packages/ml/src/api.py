@@ -377,22 +377,37 @@ async def find_similar_to_top_clients(request: SimilarRequest = None):
     }
 
 
+class EmbeddingsRequest(BaseModel):
+    profile_ids: Optional[list[str]] = None
+    limit: int = 500
+
+
 @app.post("/ml/embeddings/generate")
-async def generate_embeddings(background_tasks: BackgroundTasks):
-    """Generate embeddings for unscored profiles (background task)."""
-    background_tasks.add_task(_generate_embeddings_job)
+async def generate_embeddings(request: EmbeddingsRequest = None, background_tasks: BackgroundTasks = None):
+    """Generate embeddings for profiles (optionally specific IDs)."""
+    if background_tasks:
+        background_tasks.add_task(_generate_embeddings_job, request)
+    else:
+        asyncio.create_task(_generate_embeddings_job(request))
     return {"status": "started", "message": "Embedding generation running in background"}
 
 
-async def _generate_embeddings_job():
+async def _generate_embeddings_job(request: EmbeddingsRequest = None):
     db = await get_db()
     model = await get_text_model()
+    limit = request.limit if request else 500
 
-    profiles = await db.fetch("""
-        SELECT id, bio, full_name FROM profiles
-        WHERE embedding IS NULL
-        LIMIT 500
-    """)
+    if request and request.profile_ids:
+        profiles = await db.fetch("""
+            SELECT id, bio, full_name FROM profiles
+            WHERE id = ANY($1::uuid[])
+        """, request.profile_ids)
+    else:
+        profiles = await db.fetch("""
+            SELECT id, bio, full_name FROM profiles
+            WHERE embedding IS NULL
+            LIMIT $1
+        """, limit)
 
     if not profiles:
         print("No profiles need embeddings")
@@ -408,6 +423,7 @@ async def _generate_embeddings_job():
         )
 
     print(f"✅ Generated embeddings for {len(profiles)} profiles")
+    return {"generated": len(profiles)}
 
 
 @app.post("/ml/retrain")
