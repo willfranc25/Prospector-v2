@@ -42,6 +42,7 @@ export function DashboardPage() {
   const [live, setLive] = useState<any>(null);
   const [strategies, setStrategies] = useState<any[]>([]);
   const [runningStrategy, setRunningStrategy] = useState<string | null>(null);
+  const [dailyStats, setDailyStats] = useState<any[]>([]);
 
   const loadLive = useCallback(async () => {
     try {
@@ -51,9 +52,16 @@ export function DashboardPage() {
     } catch {}
   }, []);
 
+  const loadDailyStats = useCallback(async () => {
+    try {
+      const res = await api.get('/pipeline/daily-stats', { days: '14' });
+      setDailyStats(res.data || []);
+    } catch {}
+  }, []);
+
   useEffect(() => {
-    fetchStats(); fetchFunnel(); fetchThroughput(); fetchNiches(); fetchPipelineRuns(); loadLive();
-    const interval = setInterval(loadLive, 15000);
+    fetchStats(); fetchFunnel(); fetchThroughput(); fetchNiches(); fetchPipelineRuns(); loadLive(); loadDailyStats();
+    const interval = setInterval(() => { loadLive(); loadDailyStats(); }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -123,6 +131,79 @@ export function DashboardPage() {
           <div className="kpi-value">{p.clients || 0}</div>
           <div className="kpi-sub">{stats?.customers || 0} semillas</div>
         </div>
+      </div>
+
+      {/* Daily Discovery Tracking */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <div>
+            <span className="card-title">📅 Tracking diario de descubrimiento</span>
+            <p className="card-subtitle">
+              Perfiles descubiertos por día · Benchmark manual: <b>500/día (125/h × 4h)</b>
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div className="stat-highlight" style={{ fontSize: '1.8rem' }}>
+              {fmtNum(dailyStats.length > 0 ? dailyStats[dailyStats.length - 1]?.discovered || 0 : 0)}
+            </div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>descubiertos hoy</div>
+          </div>
+        </div>
+
+        {/* Bar chart */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, paddingTop: 8 }}>
+          {dailyStats.length === 0 ? (
+            <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', height: '100%' }}>
+              Sin datos aún — el pipeline se llena solo con el descubrimiento automático
+            </div>
+          ) : (
+            dailyStats.map((day: any, i: number) => {
+              const maxVal = Math.max(...dailyStats.map((d: any) => d.discovered || 0), 1);
+              const h = Math.max(4, ((day.discovered || 0) / maxVal) * 90);
+              const isToday = i === dailyStats.length - 1;
+              const benchmarkH = Math.max(2, (500 / maxVal) * 90);
+              const dateLabel = new Date(day.date).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+              return (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                  <span style={{ fontSize: '0.55rem', color: isToday ? 'var(--brand-light)' : 'var(--text-muted)', fontWeight: isToday ? 700 : 400 }}>
+                    {fmtNum(day.discovered || 0)}
+                  </span>
+                  <div style={{
+                    width: '100%', maxWidth: 28, height: h,
+                    background: isToday
+                      ? 'linear-gradient(180deg, var(--brand-light), var(--brand))'
+                      : (day.discovered || 0) >= 500
+                        ? 'linear-gradient(180deg, var(--success), rgba(34,197,94,0.4))'
+                        : 'linear-gradient(180deg, var(--border-light), var(--border))',
+                    borderRadius: '3px 3px 0 0',
+                    transition: 'height 0.5s ease',
+                    position: 'relative'
+                  }}>
+                    {/* Benchmark line */}
+                    {isToday && (
+                      <div style={{
+                        position: 'absolute', bottom: benchmarkH, left: -2, right: -2,
+                        borderTop: '1px dashed var(--warning)', height: 0
+                      }} title="Benchmark manual: 500/día" />
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.5rem', color: isToday ? 'var(--text-secondary)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    {dateLabel}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Legend */}
+        {dailyStats.length > 0 && (
+          <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: '0.62rem', color: 'var(--text-muted)', justifyContent: 'center' }}>
+            <span>📊 Barras: perfiles descubiertos por día</span>
+            <span style={{ color: 'var(--warning)' }}>- - - Benchmark manual (500)</span>
+            <span style={{ color: 'var(--success)' }}>Verde: ≥500 (supera manual)</span>
+          </div>
+        )}
       </div>
 
       {/* Pipeline Status Bar */}
@@ -212,7 +293,10 @@ export function DashboardPage() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    📦 {(s.config?.resultsLimit || s.config?.limit || 500)}/ejec
+                  </span>
                   <button
                     onClick={() => triggerStrategy(s.id)}
                     disabled={runningStrategy === s.id || !s.enabled}
