@@ -154,7 +154,7 @@ async function discoverFromFollowers(runId: string, seedIds?: string[], config?:
       const runData = data;
 
       // Poll for completion
-      const items = await pollApifyRun(APIFY_TOKEN, runData.id, runData.defaultDatasetId);
+      const items = await pollApifyRun(APIFY_TOKEN, runData.id, runData.defaultDatasetId, runId);
 
       // Mark seeds as used
       if (items.length > 0) {
@@ -192,7 +192,7 @@ async function discoverFromHashtags(runId: string, config?: Record<string, any>)
       );
       if (!res.ok) throw new Error(`Apify API error: ${res.status}`);
       const { data } = await res.json();
-      return pollApifyRun(APIFY_TOKEN, data.id, data.defaultDatasetId);
+      return pollApifyRun(APIFY_TOKEN, data.id, data.defaultDatasetId, runId);
     } catch (err) {
       console.error('Apify hashtag error:', err);
       return [];
@@ -242,7 +242,7 @@ async function discoverFromCompetitors(runId: string, config?: Record<string, an
       );
       if (!res.ok) throw new Error(`Apify API error: ${res.status}`);
       const { data } = await res.json();
-      return pollApifyRun(APIFY_TOKEN, data.id, data.defaultDatasetId);
+      return pollApifyRun(APIFY_TOKEN, data.id, data.defaultDatasetId, runId);
     } catch (err) {
       console.error('Competitor discovery error:', err);
       return [];
@@ -257,27 +257,63 @@ async function genericDiscovery(runId: string, strategy: string, config?: Record
   return [];
 }
 
-async function pollApifyRun(token: string, runId: string, datasetId: string, maxWaitMs = 600000): Promise<any[]> {
+async function pollApifyRun(token: string, runId: string, datasetId: string, pipelineRunId: string, maxWaitMs = 480000): Promise<any[]> {
   const start = Date.now();
-  const pollInterval = 15000;
+  const pollInterval = 10000;
+  let attempt = 0;
+
+  console.log(`⏳ Polling Apify run ${runId} (max ${maxWaitMs / 1000}s)...`);
 
   while (Date.now() - start < maxWaitMs) {
-    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`);
-    if (!statusRes.ok) throw new Error(`Status check failed: ${statusRes.status}`);
+    attempt++;
+    const elapsed = Math.round((Date.now() - start) / 1000);
 
-    const { data } = await statusRes.json();
-    if (data.status === 'SUCCEEDED') {
-      const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`);
-      if (!itemsRes.ok) throw new Error(`Dataset fetch failed: ${itemsRes.status}`);
-      return itemsRes.json();
-    }
+    try {
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`, {
+        signal: AbortSignal.timeout(15000)
+      });
 
-    if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(data.status)) {
-      throw new Error(`Apify run ${data.status}`);
+      if (!statusRes.ok) {
+        console.warn(`⚠️ Poll #${attempt}: HTTP ${statusRes.status} (${elapsed}s)`);
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+
+      const { data } = await statusRes.json();
+      console.log(`📡 Poll #${attempt}: status=${data.status} (${elapsed}s elapsed)`);
+
+      // Update pipeline run with progress
+      try {
+        await sql`
+          UPDATE pipeline_runs
+          SET stats = ${JSON.stringify({ progress: data.status, elapsed_seconds: elapsed, attempt })}
+          WHERE id = ${pipelineRunId}
+        `;
+      } catch {}
+
+      if (data.status === 'SUCCEEDED') {
+        console.log(`✅ Apify run completed, fetching dataset ${datasetId}...`);
+        const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`, {
+          signal: AbortSignal.timeout(30000)
+        });
+        if (!itemsRes.ok) throw new Error(`Dataset fetch failed: ${itemsRes.status}`);
+        const items = await itemsRes.json();
+        console.log(`📦 Got ${items.length} items from Apify`);
+        return items;
+      }
+
+      if (['FAILED', 'ABORTED', 'TIMED-OUT'].includes(data.status)) {
+        console.error(`❌ Apify run ended with status: ${data.status}`);
+        throw new Error(`Apify run ${data.status}`);
+      }
+    } catch (err: any) {
+      if (err.message?.includes('Apify run ')) throw err; // Re-throw terminal errors
+      console.warn(`⚠️ Poll #${attempt} error: ${err.message} — retrying...`);
     }
 
     await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
+  console.error(`⏰ Poll timed out after ${Math.round((Date.now() - start) / 1000)}s`);
   throw new Error('Apify run timed out');
 }
