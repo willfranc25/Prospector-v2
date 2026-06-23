@@ -11,12 +11,11 @@ async function request(method: string, path: string, body?: any, params?: Record
     });
   }
 
-  const options: RequestInit = {
-    method,
-    headers: { 'Content-Type': 'application/json' }
-  };
+  const headers: Record<string, string> = {};
+  const options: RequestInit = { method, headers };
 
-  if (body && method !== 'GET') {
+  if (body !== undefined && method !== 'GET') {
+    headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
 
