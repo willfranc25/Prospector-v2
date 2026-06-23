@@ -299,34 +299,71 @@ async function pollApifyRun(token: string, runId: string, datasetId: string, pip
         // Try multiple ways to get items
         let items: any[] = [];
         
-        // Method 1: default dataset (with format=json and clean=true)
-        for (const format of ['json', 'csv', 'clean']) {
+        // Method 1: default dataset — try plain array, wrapped object, and formats
+        const formats = [undefined, 'json', 'csv'];
+        for (const fmt of formats) {
           try {
-            const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?format=${format}&clean=true&token=${token}`, {
-              signal: AbortSignal.timeout(30000)
-            });
-            if (itemsRes.ok) {
-              const data = await itemsRes.json();
-              if (Array.isArray(data) && data.length > 0) {
-                items = data;
-                console.log(`📦 Method 1 (format=${format}): ${items.length} items`);
+            const params = new URLSearchParams({ token });
+            if (fmt) params.set('format', fmt);
+            const itemsUrl = `https://api.apify.com/v2/datasets/${datasetId}/items?${params}`;
+            const itemsRes = await fetch(itemsUrl, { signal: AbortSignal.timeout(30000) });
+            if (!itemsRes.ok) continue;
+            
+            const text = await itemsRes.text();
+            console.log(`📦 Method 1 (fmt=${fmt || 'none'}): got ${text.length} bytes, starts with: ${text.slice(0, 100)}`);
+            
+            // Try parsing as JSON
+            try {
+              const parsed = JSON.parse(text);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                items = parsed;
+                console.log(`✅ Got ${items.length} items as raw array`);
                 break;
               }
+              // Check for wrapped format: { items: [...], data: {...} }
+              if (parsed?.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+                items = parsed.items;
+                console.log(`✅ Got ${items.length} items from .items wrapper`);
+                break;
+              }
+              if (parsed?.data?.items && Array.isArray(parsed.data.items)) {
+                items = parsed.data.items;
+                console.log(`✅ Got ${items.length} items from .data.items wrapper`);
+                break;
+              }
+              console.log(`⚠️ Parsed JSON but unexpected format: keys=${Object.keys(parsed).join(',')}`);
+            } catch {
+              // CSV format: parse manually
+              if (text.trim() && fmt === 'csv') {
+                const lines = text.trim().split('\n');
+                if (lines.length > 1) {
+                  const headers = lines[0].split(',');
+                  items = lines.slice(1).map(line => {
+                    const vals = line.split(',');
+                    const obj: any = {};
+                    headers.forEach((h, i) => obj[h.trim()] = vals[i]?.trim());
+                    return obj;
+                  });
+                  console.log(`✅ Got ${items.length} items from CSV parsing`);
+                  break;
+                }
+              }
             }
-          } catch (e: any) { console.warn(`Format ${format} failed: ${e.message}`); }
+          } catch (e: any) { console.warn(`Format ${fmt} failed: ${e.message}`); }
         }
         
         // Method 2: key-value store
         if (items.length === 0) {
           try {
-            const { defaultKeyValueStoreId } = data;
-            const kvId = defaultKeyValueStoreId || datasetId.replace('dataset', 'record');
+            const runData = data;  // preserved from status check
+            const { defaultKeyValueStoreId } = runData;
+            const kvId = defaultKeyValueStoreId || 'default';
             const kvRes = await fetch(`https://api.apify.com/v2/key-value-stores/${kvId}/records/OUTPUT?token=${token}`);
             if (kvRes.ok) {
               const kvData = await kvRes.json();
               if (Array.isArray(kvData) && kvData.length > 0) {
                 items = kvData;
-                console.log(`📦 Method 2 (key-value store OUTPUT): ${items.length} items`);
+                console.log(`📦 Method 2 (key-value store): ${items.length} items`);
               }
             }
           } catch (e: any) { console.warn(`Key-value store failed: ${e.message}`); }
