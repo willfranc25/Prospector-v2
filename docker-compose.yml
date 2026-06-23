@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -36,10 +35,10 @@ services:
     container_name: hermes-api
     ports:
       - "3001:3001"
+    env_file: .env
     environment:
       DATABASE_URL: postgresql://hermes:hermes_secret@postgres:5432/hermes
       REDIS_URL: redis://redis:6379
-      APIFY_TOKEN: ${APIFY_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,10 +51,10 @@ services:
       context: .
       dockerfile: packages/workers/Dockerfile
     container_name: hermes-workers
+    env_file: .env
     environment:
       DATABASE_URL: postgresql://hermes:hermes_secret@postgres:5432/hermes
       REDIS_URL: redis://redis:6379
-      APIFY_TOKEN: ${APIFY_TOKEN:-}
       ML_SERVICE_URL: http://ml:8000
     depends_on:
       postgres:
@@ -89,8 +88,6 @@ services:
     container_name: hermes-web
     ports:
       - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:3001
     depends_on:
       - api
     restart: unless-stopped
